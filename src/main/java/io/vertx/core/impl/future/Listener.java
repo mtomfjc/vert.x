@@ -64,12 +64,12 @@ public interface Listener<T> {
    *
    * @param value the value
    */
-  void onSuccess(T value);
+  default void onSuccess(T value) {}
 
   /**
    * Signal the failure
    *
    * @param failure the failure
    */
-  void onFailure(Throwable failure);
+  default void onFailure(Throwable failure) {}
 }

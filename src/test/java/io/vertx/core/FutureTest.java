@@ -13,6 +13,7 @@ package io.vertx.core;
 
 import io.vertx.core.impl.ContextInternal;
 import io.vertx.core.impl.NoStackTraceThrowable;
+import io.vertx.core.impl.future.FutureInternal;
 import io.vertx.core.impl.future.PromiseInternal;
 import org.junit.Test;
 
@@ -23,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -1626,5 +1628,47 @@ public class FutureTest extends FutureTestBase {
       }
     });
     waitUntil(() -> caught.size() == 1 && caught.get(0) == failure);
+  }
+
+  @Test
+  public void testAwaitSuccess() throws Exception {
+    ContextInternal worker = (ContextInternal) createWorker();
+    PromiseInternal<String> promise = worker.promise();
+    worker.runOnContext(v -> {
+      worker.nettyEventLoop().execute(() -> {
+        promise.complete("the result");
+      });
+      FutureInternal<String> future = (FutureInternal<String>) promise.future();
+      try {
+        String s = future.await();
+        assertEquals("the result", s);
+        testComplete();
+      } catch (Exception e) {
+        fail(e);
+      }
+    });
+    await();
+  }
+
+  @Test
+  public void testAwaitFailure() throws Exception {
+    ContextInternal worker = (ContextInternal) createWorker();
+    PromiseInternal<String> promise = worker.promise();
+    Throwable failure = new Throwable();
+    worker.runOnContext(v -> {
+      worker.nettyEventLoop().execute(() -> {
+        promise.fail(failure);
+      });
+      FutureInternal<String> future = (FutureInternal<String>) promise.future();
+      try {
+        String s = future.await();
+      } catch (ExecutionException e) {
+        assertSame(failure, e.getCause());
+        testComplete();
+      } catch (Exception e) {
+        fail(e);
+      }
+    });
+    await();
   }
 }
